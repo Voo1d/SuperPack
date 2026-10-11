@@ -1,0 +1,20 @@
+{
+  "name": "superpack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SuperPack — учёт склада и производства (Telegram Mini App)",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "install:all": "npm --prefix server ci && npm --prefix web ci",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "migrate": "npm --prefix server run migrate",
+    "migrate:dev": "npm --prefix server run migrate:dev",
+    "dev:server": "npm --prefix server run start:dev",
+    "dev:web": "npm --prefix web run dev",
+    "build": "npm --prefix web run build && npm --prefix server run build",
+    "start": "node server/dist/main.js",
+    "typecheck": "npm --prefix server run typecheck && npm --prefix web run typecheck",
+    "test": "npm --prefix server test"
+  }
+}

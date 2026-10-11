@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: superpack
+          POSTGRES_PASSWORD: superpack
+          POSTGRES_DB: superpack_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U superpack" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgres://superpack:superpack@localhost:5432/superpack_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            web/package-lock.json
+      - run: npm run install:all
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Миграции применяются на чистую БД и повторно
+        run: |
+          npm run migrate
+          npm run migrate
+        env:
+          DATABASE_URL: postgres://superpack:superpack@localhost:5432/superpack_test
