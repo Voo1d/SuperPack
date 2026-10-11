@@ -24,3 +24,65 @@ Dev-сервер уже настроен на автоматическое по�
 5. Отгрузка, аналитика, роли и эксплуатационная проверка.
 
 Открытые правила предметной области перечислены в `CLAUDE.md`. Если они влияют на текущую операцию, Claude должен вынести их как выбор для владельца, а не угадывать.
+
+---
+
+# Разработка (этап 1: основа, доступ Telegram, склад и приёмка)
+
+Стек: React + TypeScript + Vite (`web/`), NestJS + TypeScript (`server/`), PostgreSQL + Drizzle ORM. Принятые решения — `docs/stage-1-decisions.md`.
+
+## Быстрый старт
+
+Нужны Node.js 22+ и Docker (для локальной PostgreSQL).
+
+```bash
+cp .env.example .env            # заполните переменные (см. ниже)
+npm run install:all             # зависимости server и web по lockfile
+npm run db:up                   # PostgreSQL 16 в Docker (порт 5432)
+set -a; . ./.env; set +a        # экспорт переменных в оболочку
+npm run migrate:dev             # применить миграции
+npm run dev:server              # API на http://localhost:8000
+npm run dev:web                 # интерфейс на http://localhost:5173 (проксирует /api на :8000)
+```
+
+### Локально без токена бота
+
+В `.env` задайте `DEV_AUTH=true`, `DEV_TELEGRAM_ID=<любой ваш числовой ID>` и `ADMIN_TELEGRAM_IDS=<тот же ID>`. Тогда браузер без Telegram работает от этого пользователя-администратора: можно принимать партии и управлять сотрудниками. Это выключено по умолчанию и запрещено в `NODE_ENV=production`.
+
+### С реальным Telegram
+
+Задайте `TELEGRAM_BOT_TOKEN` (выдаёт @BotFather) и `ADMIN_TELEGRAM_IDS` (ваш Telegram ID), откройте Mini App из бота. Токен и секреты в Git не добавляются.
+
+## Переменные окружения
+
+См. `.env.example`. Обязательны `DATABASE_URL` и `TELEGRAM_BOT_TOKEN` (кроме явного `DEV_AUTH=true`). Деплой передаёт `DATABASE_URL` и `PORT` (по умолчанию 8000).
+
+## Команды
+
+| Команда | Что делает |
+|---|---|
+| `npm run typecheck` | типы server и web |
+| `npm test` | тесты сервера (нужна PostgreSQL, см. ниже) |
+| `npm run build` | сборка web и server |
+| `npm run migrate` | миграции из собранного кода (`server/dist`); так же работает в образе |
+| `npm run migrate:dev` | миграции из исходников (ts-node) |
+| `npm --prefix server run db:generate` | новая миграция из изменений `server/src/db/schema.ts` |
+| `docker build -t superpack .` | образ приложения (linux/arm64 и amd64) |
+
+Тесты используют БД из `TEST_DATABASE_URL` (по умолчанию `postgres://superpack:superpack@localhost:5432/superpack_test`); её нужно создать заранее: `createdb -h localhost -U superpack superpack_test`. Тесты сами применяют миграции и очищают таблицы — **не указывайте рабочую БД**.
+
+## Docker-образ и деплой
+
+Корневой `Dockerfile` собирает один образ: React + API с одного origin, слушает `0.0.0.0:$PORT`, `GET /health`. Сборка не требует токенов и БД. PostgreSQL в образ не входит. Перед запуском новой версии выполните `npm run migrate` внутри образа (миграции назад не откатываются, поэтому они должны быть совместимы с предыдущей версией приложения).
+
+## Проверка сценария приёмки на запущенном сервере
+
+```bash
+TELEGRAM_BOT_TOKEN=<токен сервера> ADMIN_TELEGRAM_IDS=<id админа> BASE_URL=http://localhost:8000 \
+  node scripts/acceptance-check.mjs
+```
+Скрипт подписывает `initData` локально и проходит весь путь: закрытый доступ → админ разрешает → сотрудник принимает партию → партия видна в своей категории с историей; плюс повтор кода, отрицательное количество, перерасход и блокировка.
+
+## Что работает на этапе 1
+
+Telegram-вход и роли, управление доступом сотрудников, склад по 4 категориям (поиск, фильтр, история партии), приёмка партии. Разделы «Производство», «QR и этикетки», «Аналитика» — заглушки с пометкой «скоро»; демо-данных макета в приложении нет.

@@ -1,0 +1,20 @@
+# Только локальная PostgreSQL для разработки. Приложение запускается через npm (см. README).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: superpack
+      POSTGRES_PASSWORD: superpack
+      POSTGRES_DB: superpack
+    ports:
+      - "5432:5432"
+    volumes:
+      - superpack-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superpack -d superpack"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  superpack-db:
